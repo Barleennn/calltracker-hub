@@ -40,6 +40,7 @@ export type Database = {
           phone_number: string
           status: Database["public"]["Enums"]["call_status"] | null
           updated_at: string
+          name: string | null  // Add this field
         }
         Insert: {
           assigned_to?: string | null
@@ -50,6 +51,7 @@ export type Database = {
           phone_number: string
           status?: Database["public"]["Enums"]["call_status"] | null
           updated_at?: string
+          name?: string | null  // Add this field
         }
         Update: {
           assigned_to?: string | null
@@ -60,6 +62,7 @@ export type Database = {
           phone_number?: string
           status?: Database["public"]["Enums"]["call_status"] | null
           updated_at?: string
+          name?: string | null  // Add this field
         }
         Relationships: [
           {
@@ -70,6 +73,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      phone_calls_history: {
+        Row: {
+          id: string;
+          phone_number_id: string;
+          operator_id: string;
+          status: Database["public"]["Enums"]["call_status"];
+          called_at: string;
+          notes: string | null;
+        }
+        Insert: {
+          id?: string;
+          phone_number_id: string;
+          operator_id: string;
+          status: Database["public"]["Enums"]["call_status"];
+          called_at?: string;
+          notes?: string | null;
+        }
+        Update: {
+          id?: string;
+          phone_number_id?: string;
+          operator_id?: string;
+          status?: Database["public"]["Enums"]["call_status"];
+          called_at?: string;
+          notes?: string | null;
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -249,3 +279,21 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
     ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
+
+export type PhoneNumber = {
+  id: string;
+  phone_number: string;
+  name: string;
+  status: "answered" | "no_answer" | "rejected" | null;
+};
+
+export type CallHistory = {
+  id: string;
+  phone_number_id: string;
+  operator_id: string;
+  status: "answered" | "no_answer" | "rejected";
+  called_at: string;
+  notes?: string;
+};
+
+export const name = "contact-name";
