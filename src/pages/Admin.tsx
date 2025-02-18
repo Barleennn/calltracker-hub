@@ -36,13 +36,28 @@ const Admin = () => {
       return;
     }
 
-    const { data, error } = await supabase
+    // First check if profile exists
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("is_admin")
       .eq("id", session.user.id)
-      .single();
+      .maybeSingle();
 
-    if (error || !data?.is_admin) {
+    // If no profile exists, create one
+    if (!profile) {
+      const { error: createError } = await supabase
+        .from("profiles")
+        .insert([{ id: session.user.id, is_admin: false }]);
+
+      if (createError) {
+        console.error("Error creating profile:", createError);
+        navigate("/dashboard");
+        return;
+      }
+    }
+
+    // Check if user is admin
+    if (!profile?.is_admin) {
       navigate("/dashboard");
       return;
     }
