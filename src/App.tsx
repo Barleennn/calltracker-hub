@@ -4,11 +4,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { name } from "@/integrations/supabase/types";
-import Index from "./pages/Index";
-import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
-import Admin from "./pages/Admin";
-import NotFound from "./pages/NotFound";
+import Index from "./Index";
+import Auth from "./Auth";
+import Dashboard from "./Dashboard";
+import Admin from "./Admin";
+import NotFound from "./NotFound";
 
 const queryClient = new QueryClient();
 
