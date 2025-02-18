@@ -28,6 +28,20 @@ const Dashboard = () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       navigate("/auth");
+      return;
+    }
+
+    // Check if profile exists, if not create it
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", session.user.id)
+      .maybeSingle();
+
+    if (!profile) {
+      await supabase
+        .from("profiles")
+        .insert([{ id: session.user.id }]);
     }
   };
 
@@ -89,7 +103,14 @@ const Dashboard = () => {
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="text-lg mb-2">Loading...</div>
+          <div className="text-sm text-gray-500">Please wait while we fetch your data</div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -97,53 +118,68 @@ const Dashboard = () => {
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">Call Dashboard</h1>
-          <Button variant="outline" onClick={handleLogout}>
-            <LogOut className="w-4 h-4 mr-2" />
-            Logout
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate("/admin")}>
+              Admin Panel
+            </Button>
+            <Button variant="outline" onClick={handleLogout}>
+              <LogOut className="w-4 h-4 mr-2" />
+              Logout
+            </Button>
+          </div>
         </div>
 
-        <div className="grid gap-4">
-          {phoneNumbers.map((phone) => (
-            <Card key={phone.id} className="p-4">
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                <div className="flex items-center gap-2">
-                  <Phone className="w-4 h-4" />
-                  <span className="font-medium">{phone.phone_number}</span>
+        {phoneNumbers.length === 0 ? (
+          <Card className="p-6 text-center">
+            <h2 className="text-lg font-semibold mb-2">No Phone Numbers Available</h2>
+            <p className="text-gray-500 mb-4">There are no phone numbers to display at the moment.</p>
+            <Button variant="outline" onClick={() => navigate("/admin")}>
+              Go to Admin Panel to Add Numbers
+            </Button>
+          </Card>
+        ) : (
+          <div className="grid gap-4">
+            {phoneNumbers.map((phone) => (
+              <Card key={phone.id} className="p-4">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-4 h-4" />
+                    <span className="font-medium">{phone.phone_number}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="default"
+                      onClick={() => handleCall(phone.phone_number)}
+                    >
+                      Call
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className={phone.status === "answered" ? "bg-green-100" : ""}
+                      onClick={() => updateStatus(phone.id, "answered")}
+                    >
+                      ✅ Answered
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className={phone.status === "no_answer" ? "bg-red-100" : ""}
+                      onClick={() => updateStatus(phone.id, "no_answer")}
+                    >
+                      ❌ No Answer
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className={phone.status === "rejected" ? "bg-red-100" : ""}
+                      onClick={() => updateStatus(phone.id, "rejected")}
+                    >
+                      ❌ Rejected
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button 
-                    variant="default"
-                    onClick={() => handleCall(phone.phone_number)}
-                  >
-                    Call
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className={phone.status === "answered" ? "bg-green-100" : ""}
-                    onClick={() => updateStatus(phone.id, "answered")}
-                  >
-                    ✅ Answered
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className={phone.status === "no_answer" ? "bg-red-100" : ""}
-                    onClick={() => updateStatus(phone.id, "no_answer")}
-                  >
-                    ❌ No Answer
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className={phone.status === "rejected" ? "bg-red-100" : ""}
-                    onClick={() => updateStatus(phone.id, "rejected")}
-                  >
-                    ❌ Rejected
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
