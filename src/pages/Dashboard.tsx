@@ -16,34 +16,59 @@ type PhoneNumber = {
 const Dashboard = () => {
   const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
-    checkAuth();
-    fetchPhoneNumbers();
-  }, []);
+    const initializeDashboard = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          navigate("/auth");
+          return;
+        }
 
-  const checkAuth = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      navigate("/auth");
-      return;
-    }
+        // Try to get the user's profile
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .maybeSingle();
 
-    // Check if profile exists, if not create it
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", session.user.id)
-      .maybeSingle();
+        if (profileError) {
+          throw profileError;
+        }
 
-    if (!profile) {
-      await supabase
-        .from("profiles")
-        .insert([{ id: session.user.id }]);
-    }
-  };
+        // If no profile exists, create one
+        if (!profile) {
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert([{ id: session.user.id }]);
+
+          if (insertError) {
+            throw insertError;
+          }
+        } else {
+          setIsAdmin(profile.is_admin || false);
+        }
+
+        // Fetch phone numbers
+        await fetchPhoneNumbers();
+      } catch (error: any) {
+        console.error('Dashboard initialization error:', error);
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeDashboard();
+  }, [navigate]);
 
   const fetchPhoneNumbers = async () => {
     try {
@@ -60,8 +85,6 @@ const Dashboard = () => {
         description: error.message,
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -119,9 +142,11 @@ const Dashboard = () => {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">Call Dashboard</h1>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate("/admin")}>
-              Admin Panel
-            </Button>
+            {isAdmin && (
+              <Button variant="outline" onClick={() => navigate("/admin")}>
+                Admin Panel
+              </Button>
+            )}
             <Button variant="outline" onClick={handleLogout}>
               <LogOut className="w-4 h-4 mr-2" />
               Logout
@@ -133,9 +158,11 @@ const Dashboard = () => {
           <Card className="p-6 text-center">
             <h2 className="text-lg font-semibold mb-2">No Phone Numbers Available</h2>
             <p className="text-gray-500 mb-4">There are no phone numbers to display at the moment.</p>
-            <Button variant="outline" onClick={() => navigate("/admin")}>
-              Go to Admin Panel to Add Numbers
-            </Button>
+            {isAdmin && (
+              <Button variant="outline" onClick={() => navigate("/admin")}>
+                Go to Admin Panel to Add Numbers
+              </Button>
+            )}
           </Card>
         ) : (
           <div className="grid gap-4">
