@@ -100,8 +100,12 @@ const Admin = () => {
 
     setUploading(true);
     try {
+      // Create a sanitized filename using only ASCII characters
+      const timestamp = Date.now();
+      const sanitizedName = file.name.replace(/[^\x00-\x7F]/g, '').replace(/\s+/g, '_');
+      const fileName = `${timestamp}-${sanitizedName}`;
+
       // Upload file to Supabase storage
-      const fileName = `${Date.now()}-${file.name}`;
       const { error: uploadError } = await supabase.storage
         .from('vcf_files')
         .upload(fileName, file);
