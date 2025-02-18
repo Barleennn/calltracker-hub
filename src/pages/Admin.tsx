@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Upload } from "lucide-react";
 
 type PhoneNumber = {
   id: string;
@@ -19,6 +20,7 @@ const Admin = () => {
   const [newNumber, setNewNumber] = useState("");
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -65,6 +67,80 @@ const Admin = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleVcfUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files || event.target.files.length === 0) return;
+    
+    const file = event.target.files[0];
+    if (!file.name.toLowerCase().endsWith('.vcf')) {
+      toast({
+        title: "Error",
+        description: "Please upload a .vcf file",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploading(true);
+    try {
+      // Upload file to Supabase storage
+      const fileName = `${Date.now()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from('vcf_files')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      // Read the file content
+      const text = await file.text();
+      
+      // Extract phone numbers using regex
+      const phoneRegex = /TEL[^:]*:([\+\d\s-]+)/g;
+      const phones = new Set<string>();
+      let match;
+
+      while ((match = phoneRegex.exec(text)) !== null) {
+        // Clean up phone number - remove spaces, dashes, and other characters
+        const cleanNumber = match[1].replace(/[\s-()]/g, '');
+        phones.add(cleanNumber);
+      }
+
+      // Insert phone numbers into database
+      if (phones.size > 0) {
+        const phonesToInsert = Array.from(phones).map(phone => ({
+          phone_number: phone
+        }));
+
+        const { error: insertError } = await supabase
+          .from('phone_numbers')
+          .insert(phonesToInsert);
+
+        if (insertError) throw insertError;
+
+        toast({
+          description: `Successfully imported ${phones.size} phone numbers`,
+        });
+
+        fetchPhoneNumbers();
+      } else {
+        toast({
+          title: "Warning",
+          description: "No phone numbers found in the VCF file",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+      // Reset file input
+      event.target.value = '';
     }
   };
 
@@ -130,39 +206,56 @@ const Admin = () => {
           </Button>
         </div>
 
-        <Card className="p-4 mb-6">
-          <form onSubmit={addPhoneNumber} className="flex gap-2">
-            <Input
-              type="tel"
-              placeholder="Add new phone number"
-              value={newNumber}
-              onChange={(e) => setNewNumber(e.target.value)}
-              className="flex-1"
-            />
-            <Button type="submit">Add Number</Button>
-          </form>
-        </Card>
+        <div className="grid gap-6">
+          <Card className="p-4">
+            <h2 className="text-lg font-semibold mb-4">Import Contacts</h2>
+            <div className="flex items-center gap-2">
+              <Input
+                type="file"
+                accept=".vcf"
+                onChange={handleVcfUpload}
+                disabled={uploading}
+                className="flex-1"
+              />
+              {uploading && <div className="text-sm text-gray-500">Uploading...</div>}
+            </div>
+          </Card>
 
-        <div className="grid gap-4">
-          {phoneNumbers.map((phone) => (
-            <Card key={phone.id} className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{phone.phone_number}</p>
-                  <p className="text-sm text-gray-500">
-                    Status: {phone.status || "Not called"}
-                    {phone.called_at && ` (Called: ${new Date(phone.called_at).toLocaleString()})`}
-                  </p>
+          <Card className="p-4">
+            <h2 className="text-lg font-semibold mb-4">Add Single Number</h2>
+            <form onSubmit={addPhoneNumber} className="flex gap-2">
+              <Input
+                type="tel"
+                placeholder="Add new phone number"
+                value={newNumber}
+                onChange={(e) => setNewNumber(e.target.value)}
+                className="flex-1"
+              />
+              <Button type="submit">Add Number</Button>
+            </form>
+          </Card>
+
+          <div className="grid gap-4">
+            {phoneNumbers.map((phone) => (
+              <Card key={phone.id} className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">{phone.phone_number}</p>
+                    <p className="text-sm text-gray-500">
+                      Status: {phone.status || "Not called"}
+                      {phone.called_at && ` (Called: ${new Date(phone.called_at).toLocaleString()})`}
+                    </p>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    onClick={() => deletePhoneNumber(phone.id)}
+                  >
+                    Delete
+                  </Button>
                 </div>
-                <Button
-                  variant="destructive"
-                  onClick={() => deletePhoneNumber(phone.id)}
-                >
-                  Delete
-                </Button>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            ))}
+          </div>
         </div>
       </div>
     </div>
