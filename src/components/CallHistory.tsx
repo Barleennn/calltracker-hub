@@ -14,7 +14,7 @@ type CallHistoryEntry = {
   called_at: string;
 }
 
-interface PhoneCallHistory {
+type PhoneCallHistory = {
   id: string;
   status: "answered" | "no_answer" | "rejected";
   called_at: string;
@@ -24,51 +24,81 @@ interface PhoneCallHistory {
   };
 }
 
-export function CallHistory({ userId, drawer = false }: { userId: string; drawer?: boolean }) {
+export function CallHistory({ userId, drawer = false }: { userId: string; drawer?: boolean }): JSX.Element {
   const [history, setHistory] = useState<CallHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [hasNewEntries, setHasNewEntries] = useState(false);
 
+  const fetchHistory = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('phone_calls_history')
+        .select(`
+          id,
+          status,
+          called_at,
+          phone_numbers (
+            phone_number,
+            name
+          )
+        `)
+        .eq('operator_id', userId)
+        .order('called_at', { ascending: false });
+
+      if (error) throw error;
+
+      const formattedData = (data as unknown as PhoneCallHistory[])?.map(entry => ({
+        id: entry.id,
+        phone_number: entry.phone_numbers.phone_number,
+        name: entry.phone_numbers.name,
+        status: entry.status,
+        called_at: entry.called_at
+      })) || [];
+
+      setHistory(formattedData);
+    } catch (error) {
+      console.error('Error fetching history:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Subscribe to realtime changes
   useEffect(() => {
     if (!isOpen && !drawer) return;
-    
-    const fetchHistory = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('phone_calls_history')
-          .select(`
-            id,
-            status,
-            called_at,
-            phone_numbers(
-              phone_number,
-              name
-            )
-          `)
-          .eq('operator_id', userId)
-          .order('called_at', { ascending: false });
 
-        if (error) throw error;
+    const channel = supabase
+      .channel('call_history_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'phone_calls_history',
+          filter: `operator_id=eq.${userId}`
+        },
+        async () => {
+          await fetchHistory();
+        }
+      )
+      .subscribe();
 
-        const formattedData = (data as PhoneCallHistory[])?.map(entry => ({
-          id: entry.id,
-          phone_number: entry.phone_numbers.phone_number,
-          name: entry.phone_numbers.name,
-          status: entry.status,
-          called_at: entry.called_at
-        })) || [];
-
-        setHistory(formattedData);
-      } catch (error) {
-        console.error('Error fetching history:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
+    // Initial fetch
     fetchHistory();
+
+    return () => {
+      channel.unsubscribe();
+    };
   }, [userId, isOpen, drawer]);
+
+  // Reset new entries indicator when opening
+  useEffect(() => {
+    if (isOpen || drawer) {
+      setHasNewEntries(false);
+    }
+  }, [isOpen, drawer]);
 
   const filteredHistory = history.filter(entry => 
     entry.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -90,7 +120,12 @@ export function CallHistory({ userId, drawer = false }: { userId: string; drawer
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-lg">История звонков</h2>
+            <h2 className="font-semibold text-lg relative">
+              История звонков
+              {hasNewEntries && (
+                <span className="absolute -top-1 -right-4 w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+              )}
+            </h2>
             <Button
               variant="ghost"
               size="sm"
@@ -117,7 +152,6 @@ export function CallHistory({ userId, drawer = false }: { userId: string; drawer
               />
               <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
             </div>
-
             {loading ? (
               <div className="text-center p-4">Загрузка истории...</div>
             ) : (
