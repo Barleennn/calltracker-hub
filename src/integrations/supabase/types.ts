@@ -30,6 +30,65 @@ export type Database = {
         }
         Relationships: []
       }
+      phone_numbers: {
+        Row: {
+          assigned_to: string | null
+          called_at: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          phone_number: string
+          status: Database["public"]["Enums"]["call_status"] | null
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          called_at?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          phone_number: string
+          status?: Database["public"]["Enums"]["call_status"] | null
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          called_at?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          phone_number?: string
+          status?: Database["public"]["Enums"]["call_status"] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phone_numbers_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          id: string
+          is_admin: boolean | null
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          is_admin?: boolean | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_admin?: boolean | null
+        }
+        Relationships: []
+      }
       secrets: {
         Row: {
           created_at: string
@@ -86,7 +145,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      call_status: "answered" | "no_answer" | "rejected"
     }
     CompositeTypes: {
       [_ in never]: never
